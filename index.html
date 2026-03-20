@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Tacho iOS 17</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        body { 
+            background: #000; 
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto;
+            color: white;
+            overflow-x: hidden;
+        }
+        .ios-card {
+            background: rgba(28, 28, 30, 0.8);
+            backdrop-filter: blur(20px);
+            border-radius: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .btn-ios {
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .btn-ios:active { transform: scale(0.92); opacity: 0.8; }
+        .driving-glow { box-shadow: 0 0 20px rgba(59, 130, 246, 0.5); border-color: #3b82f6; }
+        .hidden { display: none; }
+    </style>
+</head>
+<body class="p-5">
+
+    <div id="setup-screen" class="max-w-md mx-auto mt-10 text-center">
+        <div class="mb-10">
+            <i class="fa-solid fa-truck-steer text-6xl text-blue-500 mb-4"></i>
+            <h1 class="text-3xl font-bold tracking-tight">Ready for Duty?</h1>
+            <p class="text-slate-400 mt-2">Tap below to log your shift start.</p>
+        </div>
+        <button onclick="startShift()" class="w-full bg-blue-600 py-5 rounded-2xl text-xl font-bold btn-ios shadow-lg">
+            Start Shift
+        </button>
+    </div>
+
+    <div id="main-app" class="max-w-md mx-auto hidden">
+        <div class="ios-card p-6 mb-5 flex justify-between items-center">
+            <div>
+                <p class="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Speed</p>
+                <div class="flex items-baseline">
+                    <span id="speed-val" class="text-6xl font-black">0</span>
+                    <span class="text-lg ml-1 text-slate-500 font-bold">MPH</span>
+                </div>
+            </div>
+            <div class="text-right">
+                <p class="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Drive Remaining</p>
+                <p id="drive-remain" class="text-4xl font-mono font-bold text-green-400">04:30</p>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3 mb-5">
+            <div class="ios-card p-4">
+                <p class="text-[10px] font-bold text-slate-500 uppercase">Driving</p>
+                <p id="total-drive" class="text-2xl font-mono font-bold">00:00</p>
+            </div>
+            <div class="ios-card p-4">
+                <p class="text-[10px] font-bold text-slate-500 uppercase">Break</p>
+                <p id="total-break" class="text-2xl font-mono font-bold text-blue-400">00:00</p>
+            </div>
+        </div>
+
+        <div class="flex gap-3 mb-8">
+            <button onclick="setStatus('driving')" id="btn-driving" class="flex-1 ios-card p-5 flex flex-col items-center btn-ios">
+                <i class="fa-solid fa-steering-wheel text-2xl mb-2 text-blue-500"></i>
+                <span class="text-[10px] font-bold uppercase">Drive</span>
+            </button>
+            <button onclick="setStatus('rest')" id="btn-rest" class="flex-1 ios-card p-5 flex flex-col items-center btn-ios">
+                <i class="fa-solid fa-bed text-2xl mb-2 text-orange-400"></i>
+                <span class="text-[10px] font-bold uppercase">Rest</span>
+            </button>
+            <button onclick="endShift()" class="flex-1 bg-red-500/20 border border-red-500/50 p-5 rounded-2xl flex flex-col items-center btn-ios">
+                <i class="fa-solid fa-power-off text-2xl mb-2 text-red-500"></i>
+                <span class="text-[10px] font-bold uppercase">End</span>
+            </button>
+        </div>
+    </div>
+
+    <div id="rest-modal" class="fixed inset-0 bg-black/90 backdrop-blur-xl z-50 p-8 flex flex-col justify-center hidden">
+        <h2 class="text-4xl font-black mb-2">Shift Summary</h2>
+        <p id="shift-duration-text" class="text-slate-400 mb-8 font-medium">Shift lasted 0h 0m</p>
+        
+        <div class="space-y-4">
+            <div class="ios-card p-5 border-l-4 border-blue-500">
+                <p class="text-xs font-bold text-blue-500 uppercase">Recommended Rest (11h)</p>
+                <p id="rest-11" class="text-3xl font-bold mt-1">--:--</p>
+            </div>
+            <div class="ios-card p-5 border-l-4 border-orange-500">
+                <p class="text-xs font-bold text-orange-500 uppercase">Reduced Rest (9h)</p>
+                <p id="rest-9" class="text-3xl font-bold mt-1">--:--</p>
+            </div>
+        </div>
+        
+        <button onclick="location.reload()" class="mt-10 bg-white text-black py-4 rounded-2xl font-bold text-lg btn-ios">
+            New Shift
+        </button>
+    </div>
+
+    <script>
+        const tg = window.Telegram.WebApp;
+        tg.expand();
+
+        let shiftStartTime = null;
+        let status = 'rest';
+        let driveSecs = 0;
+        let breakSecs = 0;
+        const DRIVE_LIMIT = 4.5 * 3600;
+
+        function startShift() {
+            shiftStartTime = new Date();
+            document.getElementById('setup-screen').classList.add('hidden');
+            document.getElementById('main-app').classList.remove('hidden');
+            tg.HapticFeedback.notificationOccurred('success');
+            setInterval(tick, 1000);
+        }
+
+        function setStatus(s) {
+            status = s;
+            document.getElementById('btn-driving').classList.toggle('driving-glow', s === 'driving');
+            tg.HapticFeedback.impactOccurred('medium');
+        }
+
+        function tick() {
+            if (status === 'driving') {
+                driveSecs++;
+                const remain = Math.max(0, DRIVE_LIMIT - driveSecs);
+                document.getElementById('drive-remain').innerText = formatDisplay(remain);
+                document.getElementById('total-drive').innerText = formatDisplay(driveSecs);
+                
+                if (driveSecs === DRIVE_LIMIT) tg.showAlert("Time to stop! 4.5h reached.");
+            } else if (status === 'rest') {
+                breakSecs++;
+                document.getElementById('total-break').innerText = formatDisplay(breakSecs);
+            }
+        }
+
+        function endShift() {
+            const endTime = new Date();
+            const shiftMs = endTime - shiftStartTime;
+            const shiftHours = shiftMs / (1000 * 60 * 60);
+
+            // Calculate Rest times
+            const finish11 = new Date(endTime.getTime() + 11 * 60 * 60 * 1000);
+            const finish9 = new Date(endTime.getTime() + 9 * 60 * 60 * 1000);
+
+            document.getElementById('shift-duration-text').innerText = `Shift lasted ${shiftHours.toFixed(1)} hours`;
+            document.getElementById('rest-11').innerText = formatClock(finish11);
+            document.getElementById('rest-9').innerText = formatClock(finish9);
+            
+            document.getElementById('rest-modal').classList.remove('hidden');
+            tg.HapticFeedback.notificationOccurred('warning');
+        }
+
+        function formatDisplay(s) {
+            const h = Math.floor(s / 3600);
+            const m = Math.floor((s % 3600) / 60);
+            return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
+        }
+
+        function formatClock(d) {
+            return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+        }
+
+        // GPS Speedo
+        if ("geolocation" in navigator) {
+            navigator.geolocation.watchPosition((pos) => {
+                const speed = Math.round((pos.coords.speed || 0) * 2.23694);
+                document.getElementById('speed-val').innerText = Math.max(0, speed);
+            }, null, { enableHighAccuracy: true });
+        }
+    </script>
+</body>
+</html>
