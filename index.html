@@ -1,0 +1,1198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Tacho Pro - EU Driving Time Tracker</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --bg-primary: #000000;
+            --card-bg: rgba(35, 35, 37, 0.9);
+            --border-color: rgba(255,255,255,0.1);
+            --text-primary: #FFFFFF;
+            --text-secondary: #AEAEB2;
+            
+            --color-driving: linear-gradient(135deg, #FF3B30, #FF6B6B);
+            --color-break: linear-gradient(135deg, #FFCC00, #FFD93D);
+            --color-rest: linear-gradient(135deg, #0A84FF, #4DA3FF);
+            --color-other: linear-gradient(135deg, #34C759, #5BD97E);
+            --color-end: linear-gradient(135deg, #AF52DE, #C084FE);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif; }
+        
+        body {
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 480px;
+            margin: 0 auto;
+            padding: 16px;
+            padding-bottom: 140px;
+        }
+
+        /* ===== START SCREEN ===== */
+        .start-screen {
+            position: fixed;
+            inset: 0;
+            background: linear-gradient(180deg, #1a1a1a 0%, #000000 100%);
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;        }
+
+        .start-card {
+            text-align: center;
+            padding: 48px 32px;
+            background: var(--card-bg);
+            backdrop-filter: blur(30px);
+            border-radius: 32px;
+            border: 1px solid var(--border-color);
+            width: 100%;
+            max-width: 400px;
+            animation: floatUp 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        @keyframes floatUp { from { opacity: 0; transform: translateY(60px); } to { opacity: 1; transform: translateY(0); } }
+
+        .logo-container {
+            width: 100px;
+            height: 100px;
+            margin: 0 auto 24px;
+            background: var(--color-driving);
+            border-radius: 28px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 48px;
+            box-shadow: 0 10px 40px rgba(255,59,48,0.3);
+        }
+
+        .app-title { 
+            font-size: 32px; 
+            font-weight: 800; 
+            margin-bottom: 12px; 
+            letter-spacing: -0.5px;
+            background: linear-gradient(135deg, #fff 0%, #aaa 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .app-subtitle { font-size: 15px; color: var(--text-secondary); margin-bottom: 40px; line-height: 1.6; }
+
+        .modern-btn {
+            width: 100%;
+            padding: 22px 24px;
+            border-radius: 20px;
+            border: none;
+            font-size: 17px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            margin-bottom: 12px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .modern-btn::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(135deg, rgba(255,255,255,0.2) 0%, transparent 100%);
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .modern-btn:hover::after { opacity: 1; }
+        .modern-btn:active { transform: scale(0.97); }
+
+        .btn-start { background: var(--color-driving); color: white; box-shadow: 0 8px 30px rgba(255,59,48,0.4); }
+        .btn-history { background: rgba(255,255,255,0.1); color: white; backdrop-filter: blur(10px); }
+
+        /* ===== DASHBOARD ===== */
+        .dashboard { display: none; }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 28px;
+            padding: 20px 0;
+        }
+
+        .time-display {
+            font-size: 48px;
+            font-weight: 800;
+            line-height: 1;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .date-display {
+            font-size: 13px;
+            color: var(--text-secondary);
+            margin-top: 8px;
+        }
+
+        .status-badge {
+            background: rgba(52,199,89,0.15);            padding: 8px 16px;
+            border-radius: 50px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 13px;
+            font-weight: 600;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--color-rest);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+
+        /* Speed Section */
+        .speed-section {
+            display: flex;
+            align-items: center;
+            gap: 28px;
+            margin-bottom: 28px;
+            justify-content: center;
+        }
+
+        .speed-value {
+            font-size: 92px;
+            font-weight: 800;
+            line-height: 1;
+            font-variant-numeric: tabular-nums;
+            background: linear-gradient(135deg, #fff 0%, #bbaab9 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .gauge-container {
+            width: 200px;
+            height: 200px;
+            position: relative;
+        }
+
+        .gauge-ring {
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            background: conic-gradient(from 270deg, var(--color-driving) 0%, var(--color-rest) 40%, var(--color-break) 70%, rgba(255,255,255,0.05) 100%);
+            filter: blur(3px);        }
+
+        .gauge-inner {
+            width: 170px;
+            height: 170px;
+            background: var(--bg-primary);
+            border-radius: 50%;
+            position: absolute;
+            top: 15px; left: 15px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .needle-base {
+            width: 8px;
+            height: 70px;
+            background: var(--text-primary);
+            border-radius: 4px;
+            transform-origin: bottom center;
+            position: absolute;
+            bottom: 85px;
+        }
+
+        .gps-status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 14px;
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        .gps-dot { width: 8px; height: 8px; border-radius: 50%; }
+        .gps-dot.connected { background: var(--color-rest); }
+        .gps-dot.disconnected { background: var(--color-driving); }
+
+        /* Stats Cards */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
+            margin-bottom: 28px;
+        }
+
+        .stat-card {
+            background: var(--card-bg);
+            border-radius: 20px;
+            padding: 14px 8px;
+            text-align: center;            border: 1px solid var(--border-color);
+            transition: transform 0.2s;
+        }
+
+        .stat-card:active { transform: scale(0.95); }
+
+        .stat-main {
+            font-size: 16px;
+            font-weight: 700;
+            font-variant-numeric: tabular-nums;
+            margin-bottom: 6px;
+        }
+
+        .stat-icon { font-size: 16px; margin-bottom: 6px; }
+
+        .icon-driving { color: #FF3B30; }
+        .icon-break { color: #FFCC00; }
+        .icon-rest { color: #0A84FF; }
+        .icon-other { color: #34C759; }
+
+        /* Activity Buttons */
+        .activity-buttons {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+
+        .activity-btn {
+            padding: 20px 10px;
+            border-radius: 22px;
+            background: var(--card-bg);
+            border: 2px solid var(--border-color);
+            color: var(--text-primary);
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            position: relative;
+        }
+
+        .activity-btn span:first-child { font-size: 28px; }
+        .activity-btn span:last-child { font-size: 11px; font-weight: 600; }
+
+        .activity-btn.active {
+            transform: scale(1.08);
+            box-shadow: 0 12px 40px rgba(0,0,0,0.5);
+        }
+        .btn-driving.active { background: var(--color-driving); border-color: #FF3B30; }
+        .btn-break.active { background: var(--color-break); border-color: #FFCC00; }
+        .btn-rest.active { background: var(--color-rest); border-color: #0A84FF; }
+        .btn-other.active { background: var(--color-other); border-color: #34C759; }
+
+        /* End Shift Button */
+        .end-shift-btn {
+            width: 100%;
+            padding: 24px;
+            border-radius: 22px;
+            border: none;
+            background: var(--color-end);
+            color: white;
+            font-size: 17px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 12px 40px rgba(175,82,222,0.4);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            position: relative;
+            overflow: hidden;
+            z-index: 10;
+        }
+
+        .end-shift-btn::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(135deg, rgba(255,255,255,0.2) 0%, transparent 100%);
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .end-shift-btn:hover::before { opacity: 1; }
+        .end-shift-btn:active { transform: scale(0.97); box-shadow: 0 8px 30px rgba(175,82,222,0.5); }
+
+        /* Compliance Alert */
+        .compliance-alert {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 100;
+            display: none;
+            padding: 16px 24px;
+            border-radius: 18px;            font-size: 14px;
+            font-weight: 600;
+            max-width: 90%;
+            animation: slideDown 0.4s ease;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.4);
+        }
+
+        @keyframes slideDown { from { opacity: 0; transform: translate(-50%, -40px); } to { opacity: 1; transform: translate(-50%, 0); } }
+        .compliance-alert.show { display: block; }
+        .alert-danger { background: rgba(255,59,48,0.95); color: white; border: 1px solid rgba(255,59,48,0.3); }
+        .alert-warning { background: rgba(255,204,0,0.95); color: black; border: 1px solid rgba(255,204,0,0.3); }
+        .alert-success { background: rgba(52,199,89,0.95); color: white; border: 1px solid rgba(52,199,89,0.3); }
+
+        /* BG Status */
+        .bg-status {
+            position: fixed;
+            bottom: 160px;
+            right: 20px;
+            background: rgba(255,204,0,0.95);
+            color: black;
+            padding: 12px 20px;
+            border-radius: 24px;
+            font-size: 13px;
+            font-weight: 700;
+            z-index: 100;
+            display: none;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+        }
+        .bg-status.show { display: block; }
+
+        /* Progress Footer */
+        .progress-footer {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: rgba(0,0,0,0.98);
+            backdrop-filter: blur(30px);
+            padding: 20px;
+            border-top: 1px solid var(--border-color);
+        }
+
+        .progress-row { margin-bottom: 16px; }
+        .progress-info {
+            display: flex;
+            justify-content: space-between;
+            font-size: 11px;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+            font-weight: 600;        }
+
+        .progress-bar {
+            height: 8px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            border-radius: 4px;
+            transition: width 0.5s, background-color 0.3s;
+        }
+
+        /* ===== END SHIFT MODAL ===== */
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.9);
+            z-index: 2000;
+            display: none;
+            justify-content: center;
+            align-items: flex-end;
+        }
+
+        .modal-overlay.show { display: flex; }
+
+        .modal-content {
+            background: #1c1c1e;
+            border-radius: 32px 32px 0 0;
+            padding: 32px 24px 40px;
+            width: 100%;
+            max-width: 500px;
+            animation: modalSlideUp 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            max-height: 95vh;
+            overflow-y: auto;
+            box-shadow: 0 -20px 60px rgba(0,0,0,0.5);
+        }
+
+        @keyframes modalSlideUp { from { opacity: 0; transform: translateY(100px); } to { opacity: 1; transform: translateY(0); } }
+
+        .modal-title {
+            font-size: 26px;
+            font-weight: 800;
+            margin-bottom: 28px;
+            text-align: center;
+            background: linear-gradient(135deg, #fff 0%, #ccc 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;        }
+
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 14px;
+            margin-bottom: 32px;
+        }
+
+        .summary-item {
+            background: rgba(255,255,255,0.05);
+            border-radius: 18px;
+            padding: 20px;
+            text-align: center;
+            border: 1px solid var(--border-color);
+        }
+
+        .summary-value {
+            font-size: 20px;
+            font-weight: 800;
+            margin-bottom: 6px;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .summary-label {
+            font-size: 11px;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            font-weight: 600;
+        }
+
+        .section-title {
+            font-size: 16px;
+            font-weight: 700;
+            margin-bottom: 18px;
+            color: var(--text-primary);
+        }
+
+        .rest-options {
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+            margin-bottom: 32px;
+        }
+
+        .rest-option {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;            padding: 20px 22px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 18px;
+            border: 2px solid transparent;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .rest-option:hover { background: rgba(255,255,255,0.1); }
+        .rest-option.selected {
+            border-color: var(--color-rest);
+            background: rgba(10,132,255,0.15);
+        }
+
+        .rest-info h4 {
+            font-size: 16px;
+            font-weight: 700;
+            margin-bottom: 4px;
+        }
+
+        .rest-info p {
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        .rest-time {
+            font-size: 28px;
+            font-weight: 800;
+            color: var(--color-rest);
+        }
+
+        .confirm-actions {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 14px;
+        }
+
+        .action-btn {
+            padding: 18px 24px;
+            border-radius: 18px;
+            border: none;
+            font-size: 16px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .btn-confirm { background: var(--color-rest); color: white; box-shadow: 0 8px 30px rgba(10,132,255,0.4); }
+        .btn-cancel { background: rgba(255,255,255,0.1); color: white; }
+        .action-btn:active { transform: scale(0.97); }
+        /* ===== HISTORY VIEWER ===== */
+        .history-viewer {
+            display: none;
+        }
+
+        .history-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .back-btn {
+            background: rgba(255,255,255,0.1);
+            border: none;
+            color: white;
+            padding: 14px 20px;
+            border-radius: 16px;
+            font-size: 14px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.3s;
+        }
+
+        .back-btn:active { transform: scale(0.95); }
+
+        .history-list {
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+        }
+
+        .history-card {
+            background: var(--card-bg);
+            border-radius: 20px;
+            padding: 20px;
+            border: 1px solid var(--border-color);
+            transition: transform 0.2s;
+        }
+
+        .history-card:active { transform: scale(0.98); }
+
+        .history-date {
+            font-size: 12px;
+            color: var(--text-secondary);            margin-bottom: 14px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .history-stats {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+        }
+
+        .h-stat {
+            background: rgba(255,255,255,0.05);
+            padding: 14px;
+            border-radius: 14px;
+            text-align: center;
+        }
+
+        .h-stat-value {
+            font-size: 18px;
+            font-weight: 800;
+            margin-bottom: 4px;
+        }
+
+        .h-stat-label {
+            font-size: 10px;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        /* Responsive */
+        @media (max-width: 375px) {
+            .speed-value { font-size: 68px; }
+            .gauge-container { width: 160px; height: 160px; }
+            .stats-grid { grid-template-columns: repeat(2, 1fr); }
+            .activity-buttons { grid-template-columns: repeat(2, 1fr); }
+            .header { flex-direction: column; gap: 12px; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Alert -->
+    <div class="compliance-alert alert-danger" id="alert"></div>
+    
+    <!-- BG Status -->
+    <div class="bg-status" id="bg-status">
+        <i class="fas fa-clock"></i> Running in Background    </div>
+
+    <!-- Start Screen -->
+    <div class="start-screen" id="startScreen">
+        <div class="container" style="max-width: 400px;">
+            <div class="start-card">
+                <div class="logo-container">
+                    <i class="fas fa-truck-moving"></i>
+                </div>
+                <h1 class="app-title">TACHO PRO</h1>
+                <p class="app-subtitle">Professional EU-compliant<br>driving time tracker</p>
+                <button class="modern-btn btn-start" onclick="startShift()">
+                    <i class="fas fa-play-circle"></i> Start New Shift
+                </button>
+                <button class="modern-btn btn-history" onclick="openHistory()">
+                    <i class="fas fa-history"></i> View History
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Dashboard -->
+    <div class="dashboard" id="dashboard">
+        <div class="container">
+            
+            <!-- Header -->
+            <div class="header">
+                <div>
+                    <div class="time-display" id="clock">00:00:00</div>
+                    <div class="date-display" id="todayDate">-- Jan YYYY</div>
+                </div>
+                <div class="status-badge">
+                    <span class="status-dot"></span>
+                    In Progress
+                </div>
+            </div>
+
+            <!-- Speedometer -->
+            <div class="speed-section">
+                <div>
+                    <div class="speed-value" id="speedValue">0</div>
+                    <div style="color:var(--text-secondary);margin-top:8px;font-size:13px">KM/H</div>
+                </div>
+                
+                <div class="gauge-container">
+                    <div class="gauge-ring"></div>
+                    <div class="gauge-inner">
+                        <div class="needle-base" id="needle"></div>
+                    </div>
+                </div>            </div>
+
+            <div class="gps-status">
+                <span class="gps-dot disconnected" id="gpsDot"></span>
+                <span id="gpsText">Acquiring GPS signal...</span>
+            </div>
+
+            <!-- Stats Grid -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-icon"><i class="fas fa-car icon-driving"></i></div>
+                    <div class="stat-main" id="tDriving">00:00:00</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon"><i class="fas fa-coffee icon-break"></i></div>
+                    <div class="stat-main" id="tBreak">00:00:00</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon"><i class="fas fa-bed icon-rest"></i></div>
+                    <div class="stat-main" id="tRest">00:00:00</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon"><i class="fas fa-tools icon-other"></i></div>
+                    <div class="stat-main" id="tOther">00:00:00</div>
+                </div>
+            </div>
+
+            <!-- Activity Buttons -->
+            <div class="activity-buttons">
+                <button class="activity-btn btn-driving active" onclick="setActivity('driving')">
+                    <i class="fas fa-car"></i>
+                    <span>Drive</span>
+                </button>
+                <button class="activity-btn btn-break" onclick="setActivity('break')">
+                    <i class="fas fa-coffee"></i>
+                    <span>Break</span>
+                </button>
+                <button class="activity-btn btn-rest" onclick="setActivity('rest')">
+                    <i class="fas fa-bed"></i>
+                    <span>Rest</span>
+                </button>
+                <button class="activity-btn btn-other" onclick="setActivity('other')">
+                    <i class="fas fa-tools"></i>
+                    <span>Other</span>
+                </button>
+            </div>
+
+            <!-- End Shift Button -->
+            <button class="end-shift-btn" onclick="handleEndShift()">
+                <i class="fas fa-flag-checkered"></i> End & Save Shift            </button>
+
+        </div>
+    </div>
+
+    <!-- Progress Footer -->
+    <div class="progress-footer">
+        <div class="progress-row">
+            <div class="progress-info">
+                <span><i class="fas fa-chart-line"></i> Daily Driving (Max 9h)</span>
+                <span id="pDailyText">0h 0m / 9h 0m</span>
+            </div>
+            <div class="progress-bar">
+                <div class="progress-fill" id="pDailyBar" style="width:0%"></div>
+            </div>
+        </div>
+        <div class="progress-row">
+            <div class="progress-info">
+                <span><i class="fas fa-stopwatch"></i> Break Required After</span>
+                <span id="pBreakText">Not Required</span>
+            </div>
+            <div class="progress-bar">
+                <div class="progress-fill" id="pBreakBar" style="width:0%"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- End Shift Modal -->
+    <div class="modal-overlay" id="endModal">
+        <div class="modal-content">
+            <h2 class="modal-title">Shift Summary</h2>
+            
+            <!-- Summary Grid -->
+            <div class="summary-grid">
+                <div class="summary-item">
+                    <i class="fas fa-car icon-driving" style="font-size:18px;margin-bottom:8px;"></i>
+                    <div class="summary-value" id="sDriving">00:00:00</div>
+                    <div class="summary-label">Driving</div>
+                </div>
+                <div class="summary-item">
+                    <i class="fas fa-coffee icon-break" style="font-size:18px;margin-bottom:8px;"></i>
+                    <div class="summary-value" id="sBreak">00:00:00</div>
+                    <div class="summary-label">Breaks</div>
+                </div>
+                <div class="summary-item">
+                    <i class="fas fa-bed icon-rest" style="font-size:18px;margin-bottom:8px;"></i>
+                    <div class="summary-value" id="sRest">00:00:00</div>
+                    <div class="summary-label">Rest</div>
+                </div>
+                <div class="summary-item">                    <i class="fas fa-clock icon-other" style="font-size:18px;margin-bottom:8px;"></i>
+                    <div class="summary-value" id="sTotal">00:00:00</div>
+                    <div class="summary-label">Today Total</div>
+                </div>
+            </div>
+
+            <!-- Next Shift Options -->
+            <h3 class="section-title">
+                <i class="fas fa-calendar-day"></i> Next Shift Time
+            </h3>
+            <div class="rest-options">
+                <div class="rest-option selected" data-rest="9" onclick="selectRestOption(9)">
+                    <div class="rest-info">
+                        <h4><i class="fas fa-hourglass-half"></i> Reduced Rest (9 Hours)</h4>
+                        <p>Minimum 9 hours of rest required</p>
+                    </div>
+                    <div class="rest-time" id="time9">--:--</div>
+                </div>
+                <div class="rest-option" data-rest="11" onclick="selectRestOption(11)">
+                    <div class="rest-info">
+                        <h4><i class="fas fa-moon"></i> Standard Rest (11 Hours)</h4>
+                        <p>Standard daily rest requirement</p>
+                    </div>
+                    <div class="rest-time" id="time11">--:--</div>
+                </div>
+            </div>
+
+            <!-- Actions -->
+            <div class="confirm-actions">
+                <button class="action-btn btn-confirm" onclick="saveShiftAndClose()">
+                    <i class="fas fa-check-circle"></i> Confirm & Save
+                </button>
+                <button class="action-btn btn-cancel" onclick="hideEndShiftModal()">
+                    <i class="fas fa-times"></i> Cancel
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- History Viewer -->
+    <div class="history-viewer" id="historyViewer">
+        <div class="container">
+            <div class="history-header">
+                <button class="back-btn" onclick="goBackToStart()">
+                    <i class="fas fa-arrow-left"></i> Back
+                </button>
+                <h2 style="font-size:20px;font-weight:800">
+                    <i class="fas fa-history"></i> Shift History
+                </h2>
+                <input type="date" class="back-btn" id="historyDate" onchange="loadHistory(this.value)" style="color:white;background:rgba(255,255,255,0.1);border:none;border-radius:16px;padding:14px 20px;font-size:14px;cursor:pointer">            </div>
+            <div class="history-list" id="historyList">
+                <!-- Items loaded via JS -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const tg = window.Telegram.WebApp;
+        tg.expand();
+
+        // Constants
+        const DAILY_LIMIT = 9 * 3600;
+        const BREAK_AFTER = 4.5 * 3600;
+
+        // State Management - NO LOCALSTORAGE!
+        let state = 'idle';
+        let lastChange = Date.now();
+        let activity = { driving: 0, break: 0, rest: 0, other: 0 };
+        let timer = null;
+        let bgTimeout;
+        let tempSelectedRest = 9;
+
+        document.addEventListener('DOMContentLoaded', () => {
+            initClock();
+            loadGPS();
+            document.getElementById('todayDate').textContent = new Date().toLocaleDateString('en-GB', { weekday: 'long', year: 'numeric', month: 'short', day: 'numeric' });
+            document.getElementById('historyDate').valueAsDate = new Date();
+            
+            document.addEventListener('visibilitychange', handleVisibility);
+            window.addEventListener('blur', showBgStatus);
+            window.addEventListener('focus', clearBgStatus);
+        });
+
+        function initClock() {
+            setInterval(() => {
+                document.getElementById('clock').textContent = 
+                    new Date().toLocaleTimeString('en-GB', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            }, 1000);
+        }
+
+        function loadGPS() {
+            if ('geolocation' in navigator) {
+                navigator.geolocation.watchPosition(pos => {
+                    const speed = Math.abs(pos.coords.speed || 0) * 3.6;
+                    document.getElementById('speedValue').textContent = Math.round(speed);
+                    
+                    document.getElementById('gpsDot').classList.remove('disconnected');
+                    document.getElementById('gpsDot').classList.add('connected');
+                    document.getElementById('gpsText').textContent = 'GPS Signal Active';                    
+                    const deg = ((Math.round(speed) / 150) * 180) - 90;
+                    document.getElementById('needle').style.transform = `rotate(${Math.max(-90, Math.min(deg, 90))}deg)`;
+                }, err => {
+                    document.getElementById('gpsText').textContent = 'No GPS Signal';
+                }, { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 });
+            } else {
+                document.getElementById('gpsText').textContent = 'GPS Not Supported';
+            }
+        }
+
+        function startShift() {
+            try {
+                document.getElementById('startScreen').style.display = 'none';
+                document.getElementById('dashboard').style.display = 'block';
+                tg.setHeaderColor('#000000');
+                tg.setBackgroundColor('#000000');
+                startTimer();
+                setActivity('driving');
+                showAlert('Shift Started! Safe travels.', 'success');
+            } catch(e) {
+                showAlert('Error: ' + e.message, 'danger');
+            }
+        }
+
+        function openHistory() {
+            document.getElementById('startScreen').style.display = 'none';
+            document.getElementById('historyViewer').style.display = 'block';
+            loadHistory();
+        }
+
+        function goBackToStart() {
+            document.getElementById('historyViewer').style.display = 'none';
+            document.getElementById('startScreen').style.display = 'flex';
+            document.getElementById('dashboard').style.display = 'none';
+        }
+
+        function startTimer() {
+            if (timer) clearInterval(timer);
+            
+            timer = setInterval(() => {
+                if (state !== 'ended') {
+                    const elapsed = Math.floor((Date.now() - lastChange) / 1000);
+                    if(state in activity) {
+                        activity[state] += elapsed;
+                    }
+                    lastChange = Date.now();
+                    updateDisplay();
+                    checkCompliance();
+                }            }, 1000);
+        }
+
+        function stopTimer() {
+            if (timer) {
+                clearInterval(timer);
+                timer = null;
+            }
+        }
+
+        function setActivity(newState) {
+            if (newState === state || newState === 'ended') return;
+
+            if (state !== 'idle' && state !== 'ended') {
+                const elapsed = Math.floor((Date.now() - lastChange) / 1000);
+                activity[state] += elapsed;
+            }
+
+            state = newState;
+            lastChange = Date.now();
+
+            document.querySelectorAll('.activity-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            document.querySelector(`.btn-${newState}`).classList.add('active');
+
+            if (newState === 'driving') {
+                startTimer();
+            }
+
+            updateDisplay();
+            hideAlert();
+        }
+
+        function updateDisplay() {
+            document.getElementById('tDriving').textContent = formatTime(activity.driving);
+            document.getElementById('tBreak').textContent = formatTime(activity.break);
+            document.getElementById('tRest').textContent = formatTime(activity.rest);
+            document.getElementById('tOther').textContent = formatTime(activity.other);
+
+            const pct = Math.min((activity.driving / DAILY_LIMIT) * 100, 100);
+            document.getElementById('pDailyBar').style.width = pct + '%';
+            document.getElementById('pDailyText').textContent = `${formatShort(activity.driving)} / 9h 0m`;
+
+            if (pct >= 100) document.getElementById('pDailyBar').style.background = '#FF3B30';
+            else if (pct >= 75) document.getElementById('pDailyBar').style.background = '#FFCC00';
+            else document.getElementById('pDailyBar').style.background = '#34C759';
+
+            const mins = Math.floor(activity.driving / 60);
+            const breakPct = Math.min((mins / 270) * 100, 100);            document.getElementById('pBreakBar').style.width = breakPct + '%';
+            document.getElementById('pBreakText').textContent = mins >= 270 ? 'REQUIRED NOW!' : `${270 - mins}min remaining`;
+            document.getElementById('pBreakText').style.color = mins >= 270 ? '#FF3B30' : 'var(--text-secondary)';
+        }
+
+        function checkCompliance() {
+            const mins = Math.floor(activity.driving / 60);
+            
+            if (mins >= 270 && state !== 'break') {
+                showAlert('⚠️ Mandatory Break Required!', 'warning');
+            }
+            
+            if (mins >= 540 && state === 'driving') {
+                showAlert('🚫 9-Hour Daily Limit Reached!', 'danger');
+            }
+        }
+
+        function handleEndShift() {
+            try {
+                if (state !== 'ended') {
+                    setActivity('ended');
+                }
+                showModalWithData();
+            } catch(e) {
+                showAlert('Error: ' + e.message, 'danger');
+            }
+        }
+
+        function showModalWithData() {
+            try {
+                stopTimer();
+
+                document.getElementById('sDriving').textContent = formatTime(activity.driving);
+                document.getElementById('sBreak').textContent = formatTime(activity.break);
+                document.getElementById('sRest').textContent = formatTime(activity.rest);
+                
+                const total = activity.driving + activity.break + activity.rest + activity.other;
+                document.getElementById('sTotal').textContent = formatTime(total);
+
+                calcNextTimes();
+                selectRestOption(tempSelectedRest);
+                
+                document.getElementById('endModal').classList.add('show');
+            } catch(e) {
+                console.error('Error showing modal:', e);
+            }
+        }
+
+        function calcNextTimes() {
+            const now = new Date();            const t9 = new Date(now.getTime() + 9*3600*1000).toLocaleTimeString('en-GB', { hour:'2-digit', minute:'2-digit' });
+            const t11 = new Date(now.getTime() + 11*3600*1000).toLocaleTimeString('en-GB', { hour:'2-digit', minute:'2-digit' });
+            document.getElementById('time9').textContent = t9;
+            document.getElementById('time11').textContent = t11;
+        }
+
+        function selectRestOption(hours) {
+            tempSelectedRest = hours;
+            document.querySelectorAll('.rest-option').forEach(opt => opt.classList.remove('selected'));
+            document.querySelector(`[data-rest="${hours}"]`).classList.add('selected');
+        }
+
+        function saveShiftAndClose() {
+            try {
+                const history = JSON.parse(localStorage.getItem('tach_history') || '[]');
+                const sessionData = {
+                    date: new Date().toISOString(), 
+                    ...activity,
+                    total: activity.driving + activity.break + activity.rest + activity.other,
+                    restType: tempSelectedRest
+                };
+                history.push(sessionData);
+                
+                try {
+                    localStorage.setItem('tach_history', JSON.stringify(history));
+                } catch(e) {
+                    console.log('LocalStorage not available');
+                }
+
+                document.getElementById('endModal').classList.remove('show');
+                showAlert('✅ Shift Saved Successfully!', 'success');
+
+                setTimeout(() => {
+                    resetForNewShift();
+                }, 2000);
+            } catch(e) {
+                showAlert('Error saving shift: ' + e.message, 'danger');
+            }
+        }
+
+        function resetForNewShift() {
+            hideEndShiftModal();
+            state = 'idle';
+            activity = { driving: 0, break: 0, rest: 0, other: 0 };
+            lastChange = Date.now();
+            tempSelectedRest = 9;
+            
+            document.getElementById('startScreen').style.display = 'flex';
+            document.getElementById('dashboard').style.display = 'none';
+                        document.getElementById('tDriving').textContent = '00:00:00';
+            document.getElementById('tBreak').textContent = '00:00:00';
+            document.getElementById('tRest').textContent = '00:00:00';
+            document.getElementById('tOther').textContent = '00:00:00';
+            document.getElementById('pDailyBar').style.width = '0%';
+        }
+
+        function hideEndShiftModal() {
+            document.getElementById('endModal').classList.remove('show');
+            stopTimer();
+        }
+
+        function loadHistory(dateFilter = '') {
+            try {
+                const history = JSON.parse(localStorage.getItem('tach_history') || '[]');
+                const list = document.getElementById('historyList');
+
+                let filteredData = history;
+                if (dateFilter) {
+                    filteredData = history.filter(h => 
+                        new Date(h.date).toDateString() === new Date(dateFilter).toDateString()
+                    );
+                }
+
+                if (filteredData.length === 0) {
+                    list.innerHTML = `<div class="history-card" style="text-align:center;padding:60px 20px">
+                        <i class="fas fa-inbox" style="font-size:48px;color:var(--text-secondary);margin-bottom:16px;"></i>
+                        <p style="color:var(--text-secondary);font-size:14px">No shifts recorded</p>
+                        ${dateFilter ? '<button class="modern-btn btn-start" onclick="resetDate()" style="margin-top:16px;width:auto">Show All</button>' : ''}
+                    </div>`;
+                    return;
+                }
+
+                filteredData.sort((a,b) => new Date(b.date) - new Date(a.date));
+
+                const days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+                const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+                let html = '';
+                filteredData.forEach(shift => {
+                    const d = new Date(shift.date);
+                    html += `
+                        <div class="history-card">
+                            <div class="history-date">
+                                <i class="far fa-calendar"></i>
+                                ${days[d.getDay()]}, ${months[d.getMonth()]} ${d.getDate()} • ${d.toLocaleTimeString('en-GB')}
+                            </div>
+                            <div class="history-stats">
+                                <div class="h-stat">
+                                    <i class="fas fa-car icon-driving" style="font-size:14px;margin-bottom:6px;"></i>                                    <div class="h-stat-value">${formatShort(shift.driving)}</div>
+                                    <div class="h-stat-label">Driving</div>
+                                </div>
+                                <div class="h-stat">
+                                    <i class="fas fa-clock icon-other" style="font-size:14px;margin-bottom:6px;"></i>
+                                    <div class="h-stat-value">${formatShort(shift.total || (shift.driving + shift.break + shift.rest + shift.other))}</div>
+                                    <div class="h-stat-label">Total Hours</div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                });
+                list.innerHTML = html;
+            } catch(e) {
+                console.error('Error loading history:', e);
+                document.getElementById('historyList').innerHTML = `<div class="history-card" style="text-align:center;padding:60px 20px">
+                    <i class="fas fa-exclamation-triangle" style="font-size:48px;color:#FF3B30;margin-bottom:16px;"></i>
+                    <p style="color:var(--text-secondary);font-size:14px">Error loading history</p>
+                </div>`;
+            }
+        }
+
+        function resetDate() {
+            document.getElementById('historyDate').value = '';
+            loadHistory();
+        }
+
+        function handleVisibility() {
+            if (!document.hidden) {
+                clearTimeout(bgTimeout);
+            } else {
+                bgTimeout = setTimeout(showBgStatus, 500);
+            }
+        }
+
+        function showBgStatus() {
+            document.getElementById('bg-status').classList.add('show');
+            setTimeout(() => document.getElementById('bg-status').classList.remove('show'), 5000);
+        }
+
+        function clearBgStatus() {
+            document.getElementById('bg-status').classList.remove('show');
+        }
+
+        function showAlert(msg, type) {
+            const el = document.getElementById('alert');
+            el.textContent = msg;
+            el.className = `compliance-alert show alert-${type}`;
+            setTimeout(() => hideAlert(), 10000);
+        }
+        function hideAlert() {
+            document.getElementById('alert').classList.remove('show');
+        }
+
+        function formatTime(seconds) {
+            const h = Math.floor(seconds / 3600);
+            const m = Math.floor((seconds % 3600) / 60);
+            const s = seconds % 60;
+            return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+        }
+
+        function formatShort(seconds) {
+            const h = Math.floor(seconds / 3600);
+            const m = Math.floor((seconds % 3600) / 60);
+            return `${h}h ${m}m`;
+        }
+
+        document.addEventListener('contextmenu', event => event.preventDefault());
+    </script>
+</body>
+</html>
